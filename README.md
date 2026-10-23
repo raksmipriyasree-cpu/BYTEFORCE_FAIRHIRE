@@ -208,22 +208,3 @@ python -m pytest tests/test_core.py
 ```
 
 The listed tests cover core behaviours such as score additivity, feature availability, experience and education extraction, anonymiser leakage and the approval gate. Passing tests does not establish that the system is fair, accurate for every resume, or suitable for making employment decisions.
-
-## Future Improvements
-
-Potential next steps include:
-
-- Evaluate extraction and matching on a diverse, consented test set.
-- Add more robust OCR support for scanned resumes.
-- Test for missed evidence, false matches and inconsistent rankings.
-- Strengthen authentication, access controls, retention and deletion procedures before deployment.
-- Improve audit reporting and document the role profiles and scoring weights.
-- Gather feedback from HR reviewers and applicants to improve clarity and accessibility.
-
-## Project Status
-
-**Prototype / decision-support tool.** Features and results should be validated before any real-world use.
-
----
-
-Built with Python and Streamlit.
