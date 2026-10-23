@@ -211,3 +211,11 @@ python -m pytest tests/test_core.py
 ```
 
 The listed tests cover core behaviours such as score additivity, feature availability, experience and education extraction, anonymiser leakage and the approval gate. Passing tests does not establish that the system is fair, accurate for every resume, or suitable for making employment decisions.
+
+## Team Name: ByteForce
+Team Members: M. Raksmi Priyasree
+Harini Priya Karthikeyan
+
+Email ID: raksmi@jainvidyalaya.in / raksmipriyasree@gmail.com
+harinipriya@jainviyalaya.in / hpk1908@gmail.com
+Github Link: https://github.com/raksmipriyasree-cpu/BYTEFORCE_FAIRHIRE.git
