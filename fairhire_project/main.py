@@ -1,8 +1,3 @@
-"""FairHire — explainable, human-led resume screening.
-
-Stage 2: real resume analysis, evidence-backed decisions, plain-language
-reasons for and against, resume-improvement feedback, and an accessible UI.
-"""
 import hashlib
 import json
 import os
@@ -26,7 +21,6 @@ PINS = {"HR Recruiter": os.environ.get("FAIRHIRE_HR_PIN", "hr123"),
 
 
 def _role_jobs():
-    """Build the five vacancy definitions from the competency taxonomy."""
     jobs = []
     for role in ROLE_ORDER:
         profile = ROLE_PROFILES[role]
@@ -46,16 +40,11 @@ CATEGORY_JOBS = _role_jobs()
 
 
 def ensure_categories(store):
-    """Create only the five vacancy/category definitions, never sample applicants."""
     existing = {j["category"].casefold() for j in store.get_jobs()}
     for job in CATEGORY_JOBS:
         if job["category"].casefold() not in existing:
             store.add_job(job, actor="FairHire setup")
 
-
-# ---------------------------------------------------------------------------
-# Accessible theme
-# ---------------------------------------------------------------------------
 def _theme_css(high_contrast, large_text, reduce_motion):
     if high_contrast:
         p = {"ink": "#ffffff", "muted": "#e8e8e8", "paper": "#000000", "panel": "#141414",
@@ -127,18 +116,12 @@ hr{border-color:var(--line)!important}
         css += "*{animation:none!important;transition:none!important;scroll-behavior:auto!important}"
     return "<style>" + root + css + "</style>"
 
-
-# ---------------------------------------------------------------------------
-# Small render helpers
-# ---------------------------------------------------------------------------
 def _pill(text, tone="neutral"):
     tone = tone if tone in ("good", "warn", "bad", "neutral") else "neutral"
     return f'<span class="fh-pill {tone}">{h(str(text))}</span>'
 
 
 def _render_item(item):
-    """Render one reason. Reasons may be plain strings or structured dicts
-    with a short label, a sentence of detail and an optional quoted snippet."""
     if isinstance(item, dict):
         label = str(item.get("label", "")).strip()
         detail = str(item.get("detail", "")).strip()
@@ -325,11 +308,6 @@ def _report_button(st, result, job, filename, key):
     st.download_button("Download full analysis report (HTML)", html.encode("utf-8"),
                        f"FairHire_analysis_{re.sub(r'[^A-Za-z0-9_-]+', '_', filename)}.html",
                        "text/html", key=key)
-
-
-# ---------------------------------------------------------------------------
-# App shell
-# ---------------------------------------------------------------------------
 def run_app():
     import streamlit as st
 
@@ -440,10 +418,6 @@ def _resume_name(text, filename):
                 return line
     return os.path.splitext(os.path.basename(filename))[0].replace("_", " ").replace("-", " ").strip() or "Unnamed applicant"
 
-
-# ---------------------------------------------------------------------------
-# HR workspace
-# ---------------------------------------------------------------------------
 def hr_view(st, store, weights):
     st.markdown('<div class="fh-hero"><div class="fh-brand" style="color:#f0c3a8">HR WORKSPACE</div><h2>Applications, reviewed with evidence.</h2><p>Analyse one resume in depth, or upload a pool and compare candidates. Every result states why it was reached and what would change it.</p></div>', unsafe_allow_html=True)
     all_candidates = store.candidates()
@@ -843,10 +817,6 @@ def _pipeline_tab(st, store):
                        mails[["id", "candidate", "kind", "status", "created_at"]].to_csv(index=False).encode("utf-8"),
                        "fairhire_communication_log.csv", "text/csv")
 
-
-# ---------------------------------------------------------------------------
-# Company Head workspace
-# ---------------------------------------------------------------------------
 def head_view(st, store):
     st.markdown('<div class="fh-hero"><div class="fh-brand" style="color:#f0c3a8">COMPANY HEAD WORKSPACE</div><h2>Oversight before outcomes.</h2><p>Review HR recommendations, see the reasoning behind each one, record approval decisions and keep the process accountable.</p></div>', unsafe_allow_html=True)
     cands = store.candidates()
