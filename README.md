@@ -1,5 +1,7 @@
 # FairHire — Explainable, Human-Led Recruitment Support
 
+# Application Live Link: https://byteforcefairhire.streamlit.app/
+
 FairHire is a Streamlit-based recruitment decision-support prototype that helps HR reviewers analyse resumes against role-related competencies. It extracts resume text, identifies evidence for relevant skills, calculates an explainable score, and provides practical resume feedback.
 
 **FairHire supports human review; it does not make hiring decisions autonomously.** Reviewers should consider the full application and must never use the score as the sole basis for selecting or rejecting a candidate.
