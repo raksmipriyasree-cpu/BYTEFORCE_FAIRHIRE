@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+fairhire_uploads.db
+*.sqlite
+*.db-journal
+.streamlit/secrets.toml

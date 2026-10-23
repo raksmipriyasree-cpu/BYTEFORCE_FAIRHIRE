@@ -1,0 +1,2 @@
+# Optional independent explanation cross-check.
+shap>=0.45

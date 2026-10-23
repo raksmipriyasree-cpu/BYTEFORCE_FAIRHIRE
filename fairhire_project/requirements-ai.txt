@@ -1,0 +1,2 @@
+# Optional pretrained semantic embedding engine. Runs on CPU; does not train a model.
+sentence-transformers>=3.0
