@@ -1,11 +1,18 @@
+"""FairHire — explainable, human-led resume screening.
+
+Stage 2: real resume analysis, evidence-backed decisions, plain-language
+reasons for and against, resume-improvement feedback, and an accessible UI.
+"""
 import hashlib
 import json
 import os
 import re
 from html import escape as h
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+
 from fairhire import emailer, fairness
 from fairhire.analyzer import DEFAULT_WEIGHTS, FEATURES, analyze_single
 from fairhire.data_loader import read_resume_file
@@ -19,6 +26,7 @@ PINS = {"HR Recruiter": os.environ.get("FAIRHIRE_HR_PIN", "hr123"),
 
 
 def _role_jobs():
+    """Build the five vacancy definitions from the competency taxonomy."""
     jobs = []
     for role in ROLE_ORDER:
         profile = ROLE_PROFILES[role]
@@ -38,11 +46,16 @@ CATEGORY_JOBS = _role_jobs()
 
 
 def ensure_categories(store):
+    """Create only the five vacancy/category definitions, never sample applicants."""
     existing = {j["category"].casefold() for j in store.get_jobs()}
     for job in CATEGORY_JOBS:
         if job["category"].casefold() not in existing:
             store.add_job(job, actor="FairHire setup")
 
+
+# ---------------------------------------------------------------------------
+# Accessible theme
+# ---------------------------------------------------------------------------
 def _theme_css(high_contrast, large_text, reduce_motion):
     if high_contrast:
         p = {"ink": "#ffffff", "muted": "#e8e8e8", "paper": "#000000", "panel": "#141414",
@@ -114,10 +127,18 @@ hr{border-color:var(--line)!important}
         css += "*{animation:none!important;transition:none!important;scroll-behavior:auto!important}"
     return "<style>" + root + css + "</style>"
 
+
+# ---------------------------------------------------------------------------
+# Small render helpers
+# ---------------------------------------------------------------------------
 def _pill(text, tone="neutral"):
     tone = tone if tone in ("good", "warn", "bad", "neutral") else "neutral"
     return f'<span class="fh-pill {tone}">{h(str(text))}</span>'
+
+
 def _render_item(item):
+    """Render one reason. Reasons may be plain strings or structured dicts
+    with a short label, a sentence of detail and an optional quoted snippet."""
     if isinstance(item, dict):
         label = str(item.get("label", "")).strip()
         detail = str(item.get("detail", "")).strip()
@@ -139,6 +160,8 @@ def _render_item(item):
             text += f"<br><span class='fh-quote'>\u201c{h(snippet)}\u201d</span>"
         return text
     return h(str(item))
+
+
 def _reason_text(item):
     """Plain-text version of a reason, for places that cannot use HTML."""
     if isinstance(item, dict):
@@ -146,10 +169,14 @@ def _reason_text(item):
         detail = str(item.get("detail", "")).strip()
         return " \u2014 ".join(p for p in (label, detail) if p)
     return str(item)
+
+
 def _bullets(items, empty="None recorded."):
     if not items:
         return f"<p class='fh-small'>{h(empty)}</p>"
     return "<ul>" + "".join(f"<li>{_render_item(i)}</li>" for i in items) + "</ul>"
+
+
 def _verdict_panel(st, verdict, score):
     tone = verdict.get("tone", "neutral")
     st.markdown(
@@ -167,6 +194,8 @@ def _verdict_panel(st, verdict, score):
         </div>""",
         unsafe_allow_html=True,
     )
+
+
 def _reasons_panel(st, verdict):
     left, right = st.columns(2, gap="medium")
     with left:
@@ -182,6 +211,8 @@ def _reasons_panel(st, verdict):
     with st.expander("What would change this decision? (counterfactuals)", expanded=False):
         st.markdown(_bullets(verdict.get("counterfactuals"), "No counterfactual could be computed."),
                     unsafe_allow_html=True)
+
+
 def _evidence_table(st, criteria):
     rows = []
     for c in criteria:
@@ -195,6 +226,8 @@ def _evidence_table(st, criteria):
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True,
                  column_config={"Evidence from the resume": st.column_config.TextColumn(width="large")})
+
+
 def _feedback_panel(st, feedback):
     st.markdown("#### What this resume does well")
     for s in feedback.get("strengths", []):
@@ -217,11 +250,13 @@ def _feedback_panel(st, feedback):
     st.download_button("Download this feedback (.txt)", txt.encode("utf-8"),
                        "fairhire_resume_feedback.txt", "text/plain", key="dl_feedback")
 
+
 def _ats_panel(st, feedback):
     st.markdown(f"**ATS readiness: {feedback.get('ats_score', 0)}/100**")
     rows = [{"Check": c["check"], "Result": "Pass" if c["pass"] else "Fix", "Note": c["note"]}
             for c in feedback.get("ats", [])]
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
 
 def _parsed_panel(st, parsed):
     a, b, c = st.columns(3)
@@ -236,6 +271,7 @@ def _parsed_panel(st, parsed):
         for r in parsed["experience"]:
             st.markdown(f"- **{h(r.get('title') or 'Role')}** — {h(r.get('dates') or '')}")
     st.caption("Identity details (name, email, phone, links) are parsed for contact only and are never scoring features.")
+
 
 def _feature_chart(st, features, weights, key):
     w = {f: max(float((weights or DEFAULT_WEIGHTS).get(f, 0.0)), 0.0) for f in FEATURES}
@@ -259,6 +295,8 @@ def _feature_chart(st, features, weights, key):
     st.caption("Chart alternative: the same values are listed in the table below.")
     with st.expander("View score components as a table"):
         st.dataframe(df, use_container_width=True, hide_index=True)
+
+
 def _waterfall(st, row, key):
     contribution_values = [float(row["contribs"].get(f, 0.0)) for f in FEATURES]
     fig = go.Figure(go.Waterfall(
@@ -280,11 +318,18 @@ def _waterfall(st, row, key):
         tbl = pd.DataFrame({"Component": ["Pool baseline"] + [f.replace("_", " ").title() for f in FEATURES] + ["Final score"],
                             "Points": [round(float(row["base_value"]), 2)] + [round(v, 2) for v in contribution_values] + [round(float(row["score"]), 2)]})
         st.dataframe(tbl, use_container_width=True, hide_index=True)
+
+
 def _report_button(st, result, job, filename, key):
     html = build_report_html(result, job, filename)
     st.download_button("Download full analysis report (HTML)", html.encode("utf-8"),
                        f"FairHire_analysis_{re.sub(r'[^A-Za-z0-9_-]+', '_', filename)}.html",
                        "text/html", key=key)
+
+
+# ---------------------------------------------------------------------------
+# App shell
+# ---------------------------------------------------------------------------
 def run_app():
     import streamlit as st
 
@@ -294,6 +339,7 @@ def run_app():
     if "a11y" not in st.session_state:
         st.session_state.a11y = {"high_contrast": False, "large_text": False, "reduce_motion": False}
     a11y = st.session_state.a11y
+
     with st.sidebar:
         st.markdown("### Accessibility")
         a11y["large_text"] = st.toggle("Larger text", value=a11y["large_text"], help="Increase the base font size across the app.")
@@ -304,11 +350,13 @@ def run_app():
     st.markdown(_theme_css(a11y["high_contrast"], a11y["large_text"], a11y["reduce_motion"]), unsafe_allow_html=True)
     st.markdown('<a class="fh-skip" href="#fh-main">Skip to main content</a>', unsafe_allow_html=True)
     st.markdown('<div id="fh-main" tabindex="-1"></div>', unsafe_allow_html=True)
+
     @st.cache_resource
     def get_store():
         store = Store("fairhire_uploads.db")
         ensure_categories(store)
         return store
+
     store = get_store()
     if "workspace" not in st.session_state:
         st.session_state.workspace = None
@@ -316,6 +364,7 @@ def run_app():
     if st.session_state.workspace is None:
         _home(st, store)
         return
+
     role = st.session_state.workspace
     top_l, top_r = st.columns([5, 1])
     top_l.markdown(f'<div class="fh-brand">◈ FAIRHIRE / {h(role.upper())}</div>', unsafe_allow_html=True)
@@ -344,6 +393,8 @@ def run_app():
         hr_view(st, store, weights)
     else:
         head_view(st, store)
+
+
 def _home(st, store):
     st.markdown('<div class="fh-brand">◈ FairHire / Recruitment intelligence</div>', unsafe_allow_html=True)
     st.markdown('''<div class="fh-hero"><div class="fh-brand" style="color:#f0c3a8">EXPLAINABLE · BIAS-AWARE · HUMAN-LED</div>
@@ -374,9 +425,13 @@ def _home(st, store):
             st.session_state.workspace = "Company Head"
             st.rerun()
     st.markdown("<div class='fh-note'><b>FairHire principle:</b> the score is a decision-support signal, not an automatic hiring decision. A human reviewer remains responsible for every outcome.</div>", unsafe_allow_html=True)
+
+
 def job_picker(st, store, key, label="Role category"):
     jobs = store.get_jobs()
     return st.selectbox(label, jobs, key=key, format_func=lambda j: j["title"])
+
+
 def _resume_name(text, filename):
     for line in (text or "").splitlines()[:8]:
         line = line.strip()
@@ -384,6 +439,11 @@ def _resume_name(text, filename):
             if not re.search(r"resume|curriculum|vitae|profile|contact|email|phone", line, re.I):
                 return line
     return os.path.splitext(os.path.basename(filename))[0].replace("_", " ").replace("-", " ").strip() or "Unnamed applicant"
+
+
+# ---------------------------------------------------------------------------
+# HR workspace
+# ---------------------------------------------------------------------------
 def hr_view(st, store, weights):
     st.markdown('<div class="fh-hero"><div class="fh-brand" style="color:#f0c3a8">HR WORKSPACE</div><h2>Applications, reviewed with evidence.</h2><p>Analyse one resume in depth, or upload a pool and compare candidates. Every result states why it was reached and what would change it.</p></div>', unsafe_allow_html=True)
     all_candidates = store.candidates()
@@ -406,6 +466,7 @@ def hr_view(st, store, weights):
 
 
 def _recruitment_desk(st, store, weights):
+    """One combined intake, analysis, recommendation and HR-decision workspace."""
     st.subheader("Upload, analyse and decide — in one workspace")
     st.write("Select a vacancy and upload one or more real resumes. FairHire extracts text, scores job-related evidence, explains gaps and suggests a review action. HR controls the next step.")
     job = job_picker(st, store, "desk_role", "Vacancy / role")
@@ -499,6 +560,8 @@ def _recruitment_desk(st, store, weights):
                               "Weight": c["weight"], "Evidence guidance": c["hint"]} for c in profile["competencies"]])
         st.dataframe(comp, use_container_width=True, hide_index=True)
         st.caption("Review and tailor role criteria before using the score for any real hiring decision.")
+
+
 def _analyzer_tab(st, store, weights):
     st.subheader("Analyse one resume")
     st.write("Choose a role, then upload a resume or paste its text. You will get a score, the evidence behind it, "
@@ -572,6 +635,8 @@ def _analyzer_tab(st, store, weights):
                 "Check the quoted evidence and the role criteria before acting. Identity signals are not scoring features.</div>",
                 unsafe_allow_html=True)
     _report_button(st, result, job, filename, "an_report")
+
+
 def _upload_tab(st, store, weights):
     st.subheader("Add applications to a pool")
     st.write("Choose the role that best matches the application. Only files you upload are added as applicants.")
@@ -580,6 +645,7 @@ def _upload_tab(st, store, weights):
     cats = st.columns(5)
     for col, item in zip(cats, CATEGORY_JOBS):
         col.markdown(f'<div class="fh-card" style="padding:.8rem;min-height:100px"><div class="fh-label">ROLE</div><b>{h(item["title"])}</b></div>', unsafe_allow_html=True)
+
     st.markdown("#### Upload resumes")
     files = st.file_uploader("Select one or more resume files", type=["pdf", "docx", "txt"],
                              accept_multiple_files=True, key="resume_upload")
@@ -777,6 +843,10 @@ def _pipeline_tab(st, store):
                        mails[["id", "candidate", "kind", "status", "created_at"]].to_csv(index=False).encode("utf-8"),
                        "fairhire_communication_log.csv", "text/csv")
 
+
+# ---------------------------------------------------------------------------
+# Company Head workspace
+# ---------------------------------------------------------------------------
 def head_view(st, store):
     st.markdown('<div class="fh-hero"><div class="fh-brand" style="color:#f0c3a8">COMPANY HEAD WORKSPACE</div><h2>Oversight before outcomes.</h2><p>Review HR recommendations, see the reasoning behind each one, record approval decisions and keep the process accountable.</p></div>', unsafe_allow_html=True)
     cands = store.candidates()
